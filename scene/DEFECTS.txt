@@ -1,0 +1,76 @@
+Section 1 diagnosis: what is wrong with drawer_scene_bad.xml
+===========================================================
+
+Five defects are marked with DEFECT n comments in the file. The comments tell
+you WHERE to look, not what is wrong or how to fix it. For each one you must
+report, in one or two sentences each:
+
+  (a) the symptom you can observe in the viewer or in a short simulation,
+  (b) the physical or numerical cause,
+  (c) the change you made and why that value.
+
+Save the repaired model as scene/drawer_scene.xml. Keep the same task: the same
+robot, the same cabinet and drawer geometry, the same handle site, the same weld,
+and the same keyframe. Do not delete the drawer, weld it shut, disable gravity,
+or drop the timestep below 0.0005.
+
+The five areas
+--------------
+
+DEFECT 1  <option>
+    Look at the integration settings. Two of the three attributes there are
+    unsuitable for a contact-rich scene with stiff position actuators.
+    Hint: what stability limit does an explicit integrator have, and how does
+    it scale with the timestep?
+
+DEFECT 2  cabinet_shell geom
+    Compare the shell's extent with where the drawer front sits, then ask
+    whether those two geoms should be able to collide at all. inspect_scene.py
+    prints the overlap in millimetres and whether the pair is collidable.
+
+DEFECT 3  drawer_slide joint
+    Two attributes are missing or zero. One of them lets the drawer leave the
+    cabinet entirely; the other means nothing ever dissipates the energy you
+    put into it.
+
+DEFECT 4  drawer <inertial>
+    The mass on this element is reasonable for a wooden drawer, and the mass
+    check in inspect_scene.py passes. Look at the rest of the element.
+
+    A body has two inertial properties, not one. Compare the second one against
+    the same property of the Panda links that have to move this drawer, and ask
+    what a ratio of that size does to the constraint solver.
+
+    Hint: you can see this one. In the viewer's Rendering panel, enable the
+    "Inertia" model element - MuJoCo then draws the equivalent inertia box of
+    every body. Compare the drawer's box with the arm's.
+
+DEFECT 5  drawer_handle geoms
+    The drawer has a bracket handle built from two geoms. Print both of them
+    with their sizes AND their contact attributes before you decide which one
+    the gripper actually meets. The viewer shows you shape; it does not show
+    you what is collidable.
+
+    For the geom that does collide: the tool closes on the handle at roughly
+    0.2 to 0.5 m/s during the approach phase. Work out how far a body travels
+    in one timestep at that speed and compare it with the size of that geom.
+
+    Then think about persistence rather than a single instant. Contact is
+    re-detected from scratch every step, and the solver needs a contact that
+    lives for many consecutive steps to build up any force. Count how many
+    steps the gripper and the handle can possibly overlap on one pass. A
+    handful of steps is not a grasp - it is a tap, and the weld has nothing to
+    hold on to when it activates.
+
+Self-check
+----------
+
+    python section1/inspect_scene.py
+
+That script re-runs the checks and prints PASS/FAIL for each of the five, plus
+a 10-second stability run and a timestep-convergence comparison. You need 5/5
+PASS and both dynamic tests green before starting Section 2 - a controller
+tuned against a broken model teaches you nothing about control.
+
+Reporting a passing check without explaining the cause earns no marks. The
+grading looks at your explanation, not only at the diff.

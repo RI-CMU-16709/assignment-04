@@ -1,0 +1,46 @@
+Section 4: the same drawer, two controllers
+===========================================
+
+You now have two controllers for one task, built from the same scene, judged by
+the same criterion (drawer travel >= 0.24 m). Fill this table and save it as
+section4/comparison.json.
+
+  Metric                              | Resolved-rate (Sec 2) | PPO policy (Sec 3)
+  ------------------------------------+-----------------------+-------------------
+  Success rate                        |  1 run                |  10 episodes
+  Time to open (s)                    |                       |
+  Max |control| during the task       |                       |
+  Max joint velocity (rad/s)          |                       |
+  Environment samples consumed        |  0                    |
+  Wall-clock compute                  |                       |
+  Your engineering time               |                       |
+  Success with cabinet jitter on      |                       |
+
+Section 2 numbers come from section2/output/results.json, Section 3 numbers from
+section3/output/eval_results.json. Run the classical controller once with the
+randomised cabinet to fill the last row (add the same jitter you use in
+drawer_env.reset, or state clearly that you did not).
+
+Answer these five, in the video and in one short paragraph each:
+
+1. Sample cost. The controller needed zero environment samples; the policy
+   needed 150,000. What did you get in exchange - and did you actually get it
+   on this task?
+
+2. Where the knowledge lives. In Section 2 it is in the Jacobian, the damped
+   least-squares update, and the state machine you wrote. In Section 3 it is in
+   the reward and the network weights. Which is easier to inspect when the robot
+   does something unexpected, and why?
+
+3. The model matters to both. Name one Section 1 defect that would have broken
+   the classical controller, and one that would have quietly corrupted the RL
+   result without making training crash.
+
+4. Failure modes. One failure specific to the learned policy that cannot happen
+   to the resolved-rate controller, and one specific to the controller.
+
+5. Your recommendation. For this drawer, in a lab, next week: which one would
+   you ship? What would have to change about the task for you to switch?
+
+A defended "the classical controller wins here" earns full marks. An undefended
+"RL is better" does not.

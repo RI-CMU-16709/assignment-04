@@ -1,0 +1,83 @@
+<mujoco model="franka_drawer_bad">
+  <!--
+    This scene loads without a single warning. It is still wrong in five ways.
+
+    A model that compiles is not a model that is physically or numerically
+    sound. Open it in the MuJoCo viewer (the command is in README.txt), perturb
+    it, and watch it before you edit anything.
+
+    Then read scene/DEFECTS.txt, repair the defects, and save your corrected
+    file as scene/drawer_scene.xml. Sections 2 and 3 load that file.
+
+    Do not "fix" the model by removing the drawer, welding it shut, disabling
+    gravity, or dropping the timestep to something impractical. The repaired
+    scene must remain the same task.
+  -->
+
+  <include file="models/franka_emika_panda/panda_task.xml"/>
+  <include file="environment.xml"/>
+
+  <!-- DEFECT 1 -->
+  <option timestep="0.01" integrator="RK4" iterations="10" ls_iterations="5"/>
+
+  <worldbody>
+    <body name="cabinet" pos="0.72 0 0.48">
+      <!-- DEFECT 2 -->
+      <geom name="cabinet_shell"
+            type="box"
+            size="0.30 0.40 0.36"
+            rgba="0.34 0.28 0.22 1"/>
+
+      <body name="drawer" pos="-0.31 0 0.02">
+        <!-- DEFECT 3 -->
+        <joint name="drawer_slide"
+               type="slide"
+               axis="-1 0 0"
+               limited="false"
+               damping="0"/>
+        <!-- DEFECT 4 -->
+        <inertial pos="0 0 0" mass="0.2" diaginertia="50 50 50"/>
+        <geom name="drawer_front"
+              type="box"
+              size="0.035 0.33 0.14"
+              rgba="0.56 0.39 0.24 1"/>
+        <!-- DEFECT 5 -->
+        <geom name="drawer_handle"
+              type="capsule"
+              fromto="-0.085 -0.12 0 -0.085 0.12 0"
+              size="0.004"
+              rgba="0.08 0.08 0.08 1"/>
+        <site name="handle_site"
+              pos="-0.115 0 0"
+              type="sphere"
+              size="0.014"
+              rgba="0.1 1 0.2 1"/>
+        <geom name="drawer_handle_2"
+              type="capsule"
+              fromto="0 0 0 -0.15 0 0"
+              size="0.02"
+              rgba="0.08 0.08 0.08 1"
+              class="visual"/>
+      </body>
+    </body>
+  </worldbody>
+
+  <!--
+    Task simplification, not a defect: the controller and the policy both
+    activate this weld once the tool reaches the handle, so the assignment
+    grades control rather than finger-contact tuning.
+  -->
+  <equality>
+    <weld name="grasp_weld" body1="hand" body2="drawer" active="false" solref="0.01 1"/>
+  </equality>
+
+  <!--
+    nq = 7 arm joints + 2 finger joints + 1 drawer slide = 10.
+    nu = 7 arm actuators + 1 gripper tendon actuator = 8.
+  -->
+  <keyframe>
+    <key name="home"
+         qpos="0 -1.57079 0 -0.97 0 0.586 0.7853 0.04 0.04 0"
+         ctrl="0 -1.57079 0 -0.97 0 0.586 0.7853 255"/>
+  </keyframe>
+</mujoco>

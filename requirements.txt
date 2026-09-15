@@ -1,0 +1,10 @@
+# Lower bounds, not exact pins. Submit `pip freeze > versions.txt`: a result
+# without versions is not reproducible.
+
+mujoco>=3.3.0                     # MjModel/MjData, mj_step, Renderer, viewer
+gymnasium>=1.0.0                  # Env API, spaces, TimeLimit
+stable-baselines3>=2.4.0          # PPO, Monitor, EvalCallback
+numpy>=1.24
+matplotlib>=3.7                   # plots for Sections 1, 2, 3
+imageio>=2.31                     # RGB/depth images and the evaluation video
+imageio-ffmpeg>=0.4.9
