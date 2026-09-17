@@ -4,6 +4,9 @@
 mujoco>=3.3.0                     # MjModel/MjData, mj_step, Renderer, viewer
 gymnasium>=1.0.0                  # Env API, spaces, TimeLimit
 stable-baselines3>=2.4.0          # PPO, Monitor, EvalCallback
+tensorboard>=2.14                 # train_ppo.py always writes a TB log
+tqdm>=4.66                        # SB3 progress_bar=True
+rich>=13.0                        # SB3 progress_bar=True
 numpy>=1.24
 matplotlib>=3.7                   # plots for Sections 1, 2, 3
 imageio>=2.31                     # RGB/depth images and the evaluation video

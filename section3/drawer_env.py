@@ -11,7 +11,7 @@ five decisions that define the learning problem:
     TODO 3.2  what an action means                -> _apply_action
     TODO 3.3  when the grasp happens              -> _maybe_grasp
     TODO 3.4  when an episode terminates          -> _terminated
-    TODO 3.5  what behaviour the reward pays for  -> compute_reward
+    TODO 3.5  what behaviour the reward pays for  -> _compute_reward
 
 Observation layout (23 values, float32) - keep this order, check_drawer_env.py
 and the observation_space below assume it:
@@ -48,7 +48,14 @@ WELD = "grasp_weld"
 
 OBS_DIM = 23
 SUCCESS_DISPLACEMENT = 0.24   # metres of drawer travel
-MAX_EPISODE_STEPS = 300       # 300 * 0.02 s = 6 s of task time at frame_skip=10
+CONTROL_DT = 0.02             # s between policy actions -> 50 Hz control
+MAX_EPISODE_STEPS = 300       # 300 * CONTROL_DT = 6 s of task time
+
+# frame_skip is DERIVED from the scene you repaired in Section 1, so that the
+# control rate and the episode budget come out the same for everyone whichever
+# legal <option timestep> you chose. A hard-coded frame_skip would make a 1 ms
+# timestep a 3 s episode - less time than the Section 2 controller needs to open
+# the drawer - so the task would be unreachable rather than merely hard.
 
 
 @dataclass
@@ -72,7 +79,7 @@ class DrawerEnv(gym.Env):
     def __init__(
         self,
         render_mode: str | None = None,
-        frame_skip: int = 10,
+        frame_skip: int | None = None,
         max_joint_delta: float = 0.05,
         grasp_threshold: float = 0.03,
         randomize: bool = True,
@@ -92,7 +99,11 @@ class DrawerEnv(gym.Env):
         self.model = mujoco.MjModel.from_xml_path(str(MODEL_PATH))
         self.data = mujoco.MjData(self.model)
 
-        self.frame_skip = int(frame_skip)
+        self.frame_skip = (
+            int(frame_skip)
+            if frame_skip is not None
+            else max(int(round(CONTROL_DT / self.model.opt.timestep)), 1)
+        )
         self.max_joint_delta = float(max_joint_delta)
         self.grasp_threshold = float(grasp_threshold)
         self.randomize = bool(randomize)
@@ -123,6 +134,7 @@ class DrawerEnv(gym.Env):
 
         # ---- episode state ---------------------------------------------------
         self._grasped = False
+        self._grasp_event = False     # True only on the step the weld engages
         self._prev_action = np.zeros(7, dtype=np.float32)
         self._elapsed = 0
         self._success = False
@@ -183,6 +195,7 @@ class DrawerEnv(gym.Env):
         data.eq_active[self._weld] = 1
         mujoco.mj_forward(model, data)
         self._grasped = True
+        self._grasp_event = True    # one-off; TODO 3.5 pays it and clears it
 
     # ------------------------------------------------------------------ TODOs
     def _get_obs(self) -> np.ndarray:
@@ -191,6 +204,11 @@ class DrawerEnv(gym.Env):
         Use self.data.qpos[self._arm_qpos], self.data.qvel[self._arm_dof],
         self.ee_position, self.handle_position, self.drawer_opening,
         self.data.qvel[self._drawer_dof], and self._grasped.
+
+        Watch the shapes. self._drawer_dof is a single index, so
+        self.data.qvel[self._drawer_dof] is a 0-d scalar rather than a length-1
+        array, and np.concatenate will not mix it with the 1-d blocks. The last
+        three entries are all scalars and each needs a length of its own.
 
         Return float32 of shape (OBS_DIM,). Nothing here may be a Python list:
         SB3 will copy this array millions of times.
@@ -250,7 +268,7 @@ class DrawerEnv(gym.Env):
         """
         return False
 
-    def compute_reward(self, action: np.ndarray) -> tuple[float, dict]:
+    def _compute_reward(self, action: np.ndarray) -> tuple[float, dict]:
         """TODO 3.5 - the reward function is the specification of the behaviour.
 
         Fill in the terms below using self.reward_config weights. Suggested
@@ -263,8 +281,25 @@ class DrawerEnv(gym.Env):
             action_cost    -cfg.action_cost * ||a||^2
             action_rate    -cfg.action_rate_cost * ||a - a_prev||^2
 
-        If cfg.sparse is True, return only the success term: that ablation is
-        required in Task 3.3 and it should visibly fail to learn.
+        "Once" means once. cfg.grasp is paid on the single step the weld
+        engages, not on every step after it; self._grasp_event is True on
+        exactly that step, so pay it and set the flag back to False. A bonus
+        that repeats is worth its weight times the rest of the episode, and a
+        policy that holds the handle without ever pulling collects more of it
+        than one that opens the drawer - which is the reward hack Task 3.2 asks
+        you to describe.
+
+        If cfg.sparse is True, return only the success term. That ablation is
+        required in Task 3.3. Do not assume you know how it ends: this
+        environment switches the weld on by proximity alone, so a sparse agent
+        is still handed the grasp for free and the run is not the pure
+        exploration problem a sparse reward usually is. It sometimes beats the
+        shaped reward. Predict, run it, and explain what you actually saw.
+
+        The method is deliberately NOT called compute_reward. SB3's check_env
+        treats any environment with that attribute as goal-conditioned and then
+        demands a Dict observation space, so the name alone would fail Task 3.2.
+        Do not rename it.
 
         Return (reward, terms) where terms maps each name to its scalar value.
         The dict is logged, so keep the keys stable across runs.
@@ -288,6 +323,7 @@ class DrawerEnv(gym.Env):
         mujoco.mj_resetDataKeyframe(self.model, self.data, self._home_key)
         self.data.eq_active[self._weld] = 0
         self._grasped = False
+        self._grasp_event = False
         self._success = False
         self._elapsed = 0
         self._prev_action[:] = 0.0
@@ -325,7 +361,7 @@ class DrawerEnv(gym.Env):
         self._maybe_grasp()
         mujoco.mj_forward(self.model, self.data)
 
-        reward, terms = self.compute_reward(action)
+        reward, terms = self._compute_reward(action)
         terminated = bool(self._terminated())
 
         self._prev_action = action.copy()
@@ -381,8 +417,10 @@ class DrawerEnv(gym.Env):
     def config(self) -> dict:
         """Everything that defines this environment, for the run record."""
         return {
+            "timestep": float(self.model.opt.timestep),
             "frame_skip": self.frame_skip,
             "control_hz": 1.0 / (self.frame_skip * self.model.opt.timestep),
+            "episode_seconds": MAX_EPISODE_STEPS * self.frame_skip * self.model.opt.timestep,
             "max_joint_delta": self.max_joint_delta,
             "grasp_threshold": self.grasp_threshold,
             "randomize": self.randomize,

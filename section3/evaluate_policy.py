@@ -85,12 +85,15 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--start-seed", type=int, default=1000)
     parser.add_argument("--no-randomize", action="store_true")
+    # Task 3.3 asks for two evaluations, one with randomisation and one without.
+    # Give the second a name of its own or it overwrites the first.
+    parser.add_argument("--out", default="eval_results.json")
     args = parser.parse_args()
 
     from stable_baselines3 import PPO
 
     env = make_drawer_env(randomize=not args.no_randomize)
-    model = PPO.load(args.model)
+    model = PPO.load(args.model, device="cpu")
 
     records = [run_episode(env, model, args.start_seed + i) for i in range(args.episodes)]
     env.close()
@@ -101,7 +104,7 @@ def main() -> None:
     summary["success_displacement_m"] = SUCCESS_DISPLACEMENT
 
     OUTPUT.mkdir(exist_ok=True)
-    (OUTPUT / "eval_results.json").write_text(json.dumps(summary, indent=2) + "\n")
+    (OUTPUT / args.out).write_text(json.dumps(summary, indent=2) + "\n")
 
     fig, axes = plt.subplots(2, 1, figsize=(7, 6))
     for record in records:
@@ -116,10 +119,12 @@ def main() -> None:
     axes[1].set_xlabel("evaluation episode")
     axes[1].grid(True, alpha=0.3)
     fig.tight_layout()
-    fig.savefig(OUTPUT / "eval_plot.png", dpi=160)
+    plot_name = Path(args.out).with_suffix("").name.replace("eval_results", "eval_plot")
+    plot_path = OUTPUT / f"{plot_name}.png"
+    fig.savefig(plot_path, dpi=160)
 
     print(json.dumps(summary, indent=2))
-    print(f"\nwrote {OUTPUT / 'eval_results.json'} and {OUTPUT / 'eval_plot.png'}")
+    print(f"\nwrote {OUTPUT / args.out} and {plot_path}")
 
 
 if __name__ == "__main__":

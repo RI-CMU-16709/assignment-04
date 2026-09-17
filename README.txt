@@ -91,5 +91,5 @@ never render during training.
 Submission
 ----------
 
-Follow the exact submission list in the DOCX. Do not submit .venv/,
+Follow the exact submission list in Assignment-04.pdf. Do not submit .venv/,
 scene/models/ (the copied Menagerie meshes), or intermediate checkpoints.
